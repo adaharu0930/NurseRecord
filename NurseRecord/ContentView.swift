@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var patientID = ""
     @State private var audioRecorder: AVAudioRecorder?
     @State private var showStopRecordingAlert = false
+    @State private var recordedFileURL: URL? // 録音ファイルの保存URL
 
     var body: some View {
         if !isAuthenticated {
@@ -27,9 +28,8 @@ struct ContentView: View {
                     .padding()
                 
                 Button("認証") {
-                    // 認証が完了したら画面を切り替えて録音を開始する
+                    // 認証が完了したら画面を切り替え
                     isAuthenticated = true
-                    startRecording()
                 }
                 .padding()
                 .background(Color.blue)
@@ -42,9 +42,9 @@ struct ContentView: View {
                     // 録音ボタン
                     Button(action: {
                         if isRecording {
-                            showStopRecordingAlert = true // 録音停止確認のポップアップを表示
+                            showStopRecordingAlert = true
                         } else {
-                            toggleRecording() // 録音開始
+                            startRecording()
                         }
                     }) {
                         HStack {
@@ -60,7 +60,7 @@ struct ContentView: View {
                             title: Text("録音停止の確認"),
                             message: Text("録音を停止してもよろしいですか？"),
                             primaryButton: .destructive(Text("はい")) {
-                                toggleRecording() // 録音停止
+                                stopRecording() // 録音停止
                             },
                             secondaryButton: .cancel(Text("キャンセル"))
                         )
@@ -103,12 +103,11 @@ struct ContentView: View {
                 }
                 .padding()
                 
-                // カレンダー（DatePicker）の表示
                 if showDatePicker {
                     DatePicker("記録日", selection: $recordDate, in: Date() - 1...Date(), displayedComponents: .date)
                         .datePickerStyle(WheelDatePickerStyle())
                         .labelsHidden()
-                        .environment(\.locale, Locale(identifier: "ja_JP")) // 日本語形式に設定
+                        .environment(\.locale, Locale(identifier: "ja_JP"))
                         .frame(height: 150)
                         .padding()
                 }
@@ -127,23 +126,26 @@ struct ContentView: View {
                         TextField("P: 計画", text: .constant(""))
                     }
                 }
+
+                if let recordedFileURL = recordedFileURL {
+                    Text("録音ファイル: \(recordedFileURL.lastPathComponent)")
+                        .font(.footnote)
+                        .padding()
+                }
             }
             .onAppear {
-                // 初期値を設定（デモ用）
                 patientName = "山田 太郎"
                 patientID = "3849872"
             }
         }
     }
     
-    // 日付を「yy/mm/dd」形式でフォーマットする関数
     func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yy/MM/dd"
         return formatter.string(from: date)
     }
     
-    // 録音開始の関数
     func startRecording() {
         let audioSession = AVAudioSession.sharedInstance()
         
@@ -155,9 +157,9 @@ struct ContentView: View {
                         try audioSession.setActive(true)
                         
                         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                        let audioFileName = documentsPath.appendingPathComponent("recording.m4a") // ローカルに保存するファイル名
+                        let audioFileName = documentsPath.appendingPathComponent("recording.m4a")
                         
-                        let settings = [
+                        let settings: [String: Any] = [
                             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
                             AVSampleRateKey: 12000,
                             AVNumberOfChannelsKey: 1,
@@ -168,32 +170,22 @@ struct ContentView: View {
                         audioRecorder?.record()
                         
                         isRecording = true
+                        recordedFileURL = audioFileName
                         print("録音が開始されました: \(audioFileName)")
                     } catch {
                         print("録音エラー: \(error.localizedDescription)")
                     }
                 } else {
                     print("マイクの使用が許可されていません")
-                    // 必要に応じて、マイクアクセスが必要な理由をユーザーに通知するアラートを表示する
                 }
             }
         }
     }
     
-    // 録音停止の関数
     func stopRecording() {
         audioRecorder?.stop()
         audioRecorder = nil
         isRecording = false
         print("録音が停止されました")
-    }
-    
-    // 録音の開始と停止を切り替える関数
-    func toggleRecording() {
-        if isRecording {
-            stopRecording()
-        } else {
-            startRecording()
-        }
     }
 }
